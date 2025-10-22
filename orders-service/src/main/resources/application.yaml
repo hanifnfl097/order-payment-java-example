@@ -1,20 +1,28 @@
-
 server:
-  port: 8080
+  port: 8081
+
 spring:
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/orders}
     username: ${SPRING_DATASOURCE_USERNAME:orders}
     password: ${SPRING_DATASOURCE_PASSWORD:orders}
+
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: validate   # keep validate; schema must exist
     properties:
       hibernate.format_sql: true
       hibernate.jdbc.lob.non_contextual_creation: true
+
   flyway:
-    enabled: true
+    enabled: false         # set to true if you want orders-service to run its migrations
     locations: classpath:db/migration
+
 logging:
   level:
     org.hibernate.SQL: debug
+
+# <<< important for PaymentsClient >>>
+payments:
+  # local run (Payments on localhost:8082)
+  base-url: ${PAYMENTS_BASE_URL:http://localhost:8082}
