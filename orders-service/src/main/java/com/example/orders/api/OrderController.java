@@ -71,7 +71,7 @@ public class OrderController {
   }
 
   @GetMapping("/reports/top-products")
-  public List<Map<String, Object>> topProducts(@RequestParam(defaultValue = "5") int limit) {
+  public List<Map<String, Object>> topProducts(@RequestParam(name = "limit", defaultValue = "5") int limit) {
     return itemRepo.topProducts(limit)
             .stream()
             .map(r -> {
@@ -114,7 +114,7 @@ public class OrderController {
   }
 
   @GetMapping("/orders/stream/large")
-  public List<Map<String, Object>> largeOrders(@RequestParam(defaultValue = "100.0") double minTotal) {
+  public List<Map<String, Object>> largeOrders(@RequestParam(name = "minTotal", defaultValue = "100.0") double minTotal) {
     return analytics.findLargeOrders(minTotal);
   }
 }

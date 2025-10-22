@@ -54,8 +54,8 @@ public class PaymentController {
   /** SQL aggregation with null-safe handling */
   @GetMapping("/stats/amounts")
   public Map<String, Object> stats(
-          @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime since,
-          @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime until) {
+          @RequestParam(name = "since") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime since,
+          @RequestParam(name = "until") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime until) {
 
     Object row = repo.statsBetween(since, until);
     Map<String, Object> m = new HashMap<>();
