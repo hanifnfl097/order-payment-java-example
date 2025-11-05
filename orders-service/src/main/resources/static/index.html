@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Order & Payment Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Bootstrap 5 -->
+    <link
+            href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+            rel="stylesheet"
+    >
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            padding-top: 4rem;
+            background-color: #f5f5f7;
+        }
+        .nav-link.active {
+            font-weight: 600;
+        }
+        .table-sm td, .table-sm th {
+            padding: .25rem .5rem;
+        }
+        .cursor-pointer {
+            cursor: pointer;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .card {
+            border-radius: 0.75rem;
+        }
+        .section-title {
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top shadow-sm">
+    <div class="container-fluid">
+        <a class="navbar-brand fw-semibold" href="#">Order & Payment Dashboard</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                data-bs-target="#navbarNav" aria-controls="navbarNav"
+                aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                <li class="nav-item"><a class="nav-link active" data-section="usersSection" href="#">Users</a></li>
+                <li class="nav-item"><a class="nav-link" data-section="productsSection" href="#">Products</a></li>
+                <li class="nav-item"><a class="nav-link" data-section="ordersSection" href="#">Orders</a></li>
+                <li class="nav-item"><a class="nav-link" data-section="reportsSection" href="#">Reports</a></li>
+                <li class="nav-item"><a class="nav-link" data-section="paymentsStatsSection" href="#">Payment Stats</a></li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<main class="container">
+
+    <!-- Global Alert -->
+    <div id="alertBox" class="alert d-none mt-2" role="alert"></div>
+
+    <!-- USERS -->
+    <section id="usersSection">
+        <div class="card mb-4 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center section-title">
+                    <h3 class="mb-0">Users</h3>
+                    <button class="btn btn-primary btn-sm" onclick="createUser()">
+                        + Add User
+                    </button>
+                </div>
+                <p class="text-muted mb-2">
+                    List user yang dapat membuat order.
+                </p>
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped align-middle" id="usersTable">
+                        <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                        </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- PRODUCTS -->
+    <section id="productsSection" class="d-none">
+        <div class="card mb-4 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center section-title">
+                    <h3 class="mb-0">Products</h3>
+                    <button class="btn btn-primary btn-sm" onclick="createProduct()">
+                        + Add Product
+                    </button>
+                </div>
+                <p class="text-muted mb-2">
+                    Master data produk yang bisa dipesan.
+                </p>
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped align-middle" id="productsTable">
+                        <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Price</th>
+                        </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ORDERS -->
+    <section id="ordersSection" class="d-none">
+        <div class="card mb-4 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center section-title">
+                    <h3 class="mb-0">Orders</h3>
+                    <button class="btn btn-primary btn-sm" onclick="createOrder()">
+                        + Create Order
+                    </button>
+                </div>
+                <p class="text-muted mb-3">
+                    Klik baris order untuk melihat detail line item dan payment yang terkait.
+                </p>
+                <div class="row">
+                    <div class="col-md-7 mb-3 mb-md-0">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped align-middle" id="ordersTable">
+                                <thead class="table-light">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>User</th>
+                                    <th>Created At</th>
+                                    <th>Total (calculated)</th>
+                                </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="col-md-5">
+                        <h5 class="mb-2">Order Detail + Payment</h5>
+                        <pre id="orderDetailBox" class="bg-light p-3 border rounded" style="min-height: 180px;">
+Click an order row to view details...
+                        </pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- REPORTS -->
+    <section id="reportsSection" class="d-none">
+        <div class="section-title d-flex justify-content-between align-items-center mb-3">
+            <h3 class="mb-0">Reports & Analytics</h3>
+        </div>
+
+        <div class="row g-3">
+            <!-- Top Products -->
+            <div class="col-lg-6">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <h5 class="mb-0">Top Products</h5>
+                                <small class="text-muted">Aggregasi dari order items (SQL + Streams)</small>
+                            </div>
+                            <div>
+                                <label class="me-1 small">Limit:</label>
+                                <input type="number" id="topProductsLimit" value="5" min="1"
+                                       class="form-control form-control-sm d-inline-block"
+                                       style="width:80px">
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="loadTopProducts()">Reload</button>
+                        </div>
+                        <div class="row">
+                            <div class="col-12 mb-2">
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped align-middle" id="topProductsTable">
+                                        <thead class="table-light">
+                                        <tr>
+                                            <th>Product</th>
+                                            <th>Quantity Sold</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <canvas id="topProductsChart" height="160"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Large Orders -->
+            <div class="col-lg-6">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <h5 class="mb-0">Large Orders</h5>
+                                <small class="text-muted">Dihitung via Java Streams in-memory</small>
+                            </div>
+                            <div>
+                                <label class="me-1 small">Min Total:</label>
+                                <input type="number" id="largeOrdersMinTotal" value="100" min="0"
+                                       class="form-control form-control-sm d-inline-block"
+                                       style="width:120px">
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="loadLargeOrders()">Reload</button>
+                        </div>
+                        <div class="row">
+                            <div class="col-12 mb-2">
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped align-middle" id="largeOrdersTable">
+                                        <thead class="table-light">
+                                        <tr>
+                                            <th>Order ID</th>
+                                            <th>Created At</th>
+                                            <th>Total</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <canvas id="largeOrdersChart" height="160"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </section>
+
+    <!-- PAYMENT STATS -->
+    <section id="paymentsStatsSection" class="d-none">
+        <div class="card mb-4 shadow-sm">
+            <div class="card-body">
+                <div class="section-title">
+                    <h3 class="mb-0">Payment Stats</h3>
+                    <small class="text-muted">
+                        Data dari payments-service (native SQL aggregations).
+                    </small>
+                </div>
+
+                <form class="row g-3 mb-3" onsubmit="event.preventDefault(); loadPaymentStats();">
+                    <div class="col-md-4">
+                        <label class="form-label small">Since (ISO)</label>
+                        <input type="text" id="statsSince" class="form-control form-control-sm"
+                               placeholder="2025-01-01T00:00:00Z">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small">Until (ISO)</label>
+                        <input type="text" id="statsUntil" class="form-control form-control-sm"
+                               placeholder="2025-12-31T23:59:59Z">
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button class="btn btn-primary w-100 btn-sm" type="submit">Load Stats</button>
+                    </div>
+                </form>
+
+                <div class="row g-2 mb-3" id="paymentStatCards">
+                    <div class="col-md-4">
+                        <div class="card border-0 bg-light">
+                            <div class="card-body py-2">
+                                <div class="small text-muted">Count</div>
+                                <div class="h5 mb-0" id="statCount">-</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card border-0 bg-light">
+                            <div class="card-body py-2">
+                                <div class="small text-muted">Sum</div>
+                                <div class="h5 mb-0" id="statSum">-</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card border-0 bg-light">
+                            <div class="card-body py-2">
+                                <div class="small text-muted">Avg</div>
+                                <div class="h5 mb-0" id="statAvg">-</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <h6 class="mb-2">Raw JSON</h6>
+                        <pre id="paymentStatsBox" class="bg-light p-3 border rounded" style="min-height:120px;"></pre>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="mb-2">Chart</h6>
+                        <canvas id="paymentStatsChart" height="160"></canvas>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+</main>
+
+<script
+        src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // ===== CONFIG =====
+    const ORDERS_BASE = ''; // same origin: http://localhost:8081
+    const PAYMENTS_BASE = 'http://localhost:8082'; // sesuaikan kalau beda
+
+    // Chart instances
+    let topProductsChart = null;
+    let largeOrdersChart = null;
+    let paymentStatsChart = null;
+
+    // ===== NAV HANDLING =====
+    document.querySelectorAll('.nav-link').forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const target = link.getAttribute('data-section');
+            document.querySelectorAll('section').forEach(sec => sec.classList.add('d-none'));
+            document.getElementById(target).classList.remove('d-none');
+
+            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+            link.classList.add('active');
+
+            if (target === 'usersSection') loadUsers();
+            if (target === 'productsSection') loadProducts();
+            if (target === 'ordersSection') loadOrders();
+            if (target === 'reportsSection') {
+                loadTopProducts();
+                loadLargeOrders();
+            }
+        });
+    });
+
+    // ===== ALERT UTIL =====
+    function showAlert(message, type = 'danger') {
+        const box = document.getElementById('alertBox');
+        box.className = 'alert alert-' + type + ' mt-2';
+        box.textContent = message;
+        box.classList.remove('d-none');
+        setTimeout(() => box.classList.add('d-none'), 5000);
+    }
+
+    // ===== USERS =====
+    async function loadUsers() {
+        try {
+            const res = await fetch(`${ORDERS_BASE}/api/users`);
+            if (!res.ok) throw new Error('Failed to load users');
+            const data = await res.json();
+            const tbody = document.querySelector('#usersTable tbody');
+            tbody.innerHTML = '';
+            data.forEach(u => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${u.id}</td><td>${u.name}</td><td>${u.email || ''}</td>`;
+                tbody.appendChild(tr);
+            });
+        } catch (e) {
+            console.error(e);
+            showAlert(e.message);
+        }
+    }
+
+    async function createUser() {
+        const name = prompt('User name?');
+        if (!name) return;
+        const email = prompt('User email? (optional)');
+        try {
+            const res = await fetch(`${ORDERS_BASE}/api/users`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name, email})
+            });
+            if (!res.ok) throw new Error('Failed to create user');
+            await loadUsers();
+            showAlert('User created', 'success');
+        } catch (e) {
+            console.error(e);
+            showAlert(e.message);
+        }
+    }
+
+    // ===== PRODUCTS =====
+    async function loadProducts() {
+        try {
+            const res = await fetch(`${ORDERS_BASE}/api/products`);
+            if (!res.ok) throw new Error('Failed to load products');
+            const data = await res.json();
+            const tbody = document.querySelector('#productsTable tbody');
+            tbody.innerHTML = '';
+            data.forEach(p => {
+                const price = p.price ?? p.priceDouble ?? 0;
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${p.id}</td><td>${p.name}</td><td>${price}</td>`;
+                tbody.appendChild(tr);
+            });
+        } catch (e) {
+            console.error(e);
+            showAlert(e.message);
+        }
+    }
+
+    async function createProduct() {
+        const name = prompt('Product name?');
+        if (!name) return;
+        const priceStr = prompt('Price? (number, e.g. 99.99)');
+        const price = parseFloat(priceStr);
+        if (isNaN(price)) {
+            alert('Invalid price');
+            return;
+        }
+        try {
+            const res = await fetch(`${ORDERS_BASE}/api/products`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name, price})
+            });
+            if (!res.ok) throw new Error('Failed to create product');
+            await loadProducts();
+            showAlert('Product created', 'success');
+        } catch (e) {
+            console.error(e);
+            showAlert(e.message);
+        }
+    }
+
+    // ===== ORDERS =====
+    async function loadOrders() {
+        try {
+            const res = await fetch(`${ORDERS_BASE}/api/orders`);
+            if (!res.ok) throw new Error('Failed to load orders');
+            const data = await res.json();
+            const tbody = document.querySelector('#ordersTable tbody');
+            tbody.innerHTML = '';
+            data.forEach(o => {
+                const tr = document.createElement('tr');
+                tr.classList.add('cursor-pointer');
+                tr.addEventListener('click', () => loadOrderDetail(o.id));
+                tr.innerHTML = `<td>${o.id}</td>
+                                <td>${o.user ? o.user.name : ''}</td>
+                                <td>${o.createdAt || ''}</td>
+                                <td>(see detail)</td>`;
+                tbody.appendChild(tr);
+            });
+        } catch (e) {
+            console.error(e);
+            showAlert(e.message);
+        }
+    }
+
+    async function loadOrderDetail(orderId) {
+        try {
+            const res = await fetch(`${ORDERS_BASE}/api/orders/${orderId}/with-payment`);
+            if (!res.ok) throw new Error('Failed to load order detail');
+            const data = await res.json();
+            const box = document.getElementById('orderDetailBox');
+            box.textContent = JSON.stringify(data, null, 2);
+        } catch (e) {
+            console.error(e);
+            showAlert(e.message);
+        }
+    }
+
+    async function createOrder() {
+        alert('Create order simple UI. Sesuaikan dengan struktur CreateOrderRequest di backend.');
+
+        const userIdStr = prompt('User ID?');
+        const userId = parseInt(userIdStr, 10);
+        if (isNaN(userId)) { alert('Invalid user'); return; }
+
+        const productIdStr = prompt('Product ID?');
+        const productId = parseInt(productIdStr, 10);
+        if (isNaN(productId)) { alert('Invalid product'); return; }
+
+        const qtyStr = prompt('Quantity?');
+        const quantity = parseInt(qtyStr, 10);
+        if (isNaN(quantity)) { alert('Invalid quantity'); return; }
+
+        const payload = {
+            userId,
+            items: [{productId, quantity}]
+        };
+
+        try {
+            const res = await fetch(`${ORDERS_BASE}/api/orders`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            if (!res.ok) throw new Error('Failed to create order (cek CreateOrderRequest di backend)');
+            await loadOrders();
+            showAlert('Order created', 'success');
+        } catch (e) {
+            console.error(e);
+            showAlert(e.message);
+        }
+    }
+
+    // ===== REPORTS: TOP PRODUCTS =====
+    async function loadTopProducts() {
+        const limit = document.getElementById('topProductsLimit').value || 5;
+        try {
+            const res = await fetch(`${ORDERS_BASE}/api/reports/top-products?limit=${encodeURIComponent(limit)}`);
+            if (!res.ok) throw new Error('Failed to load top products');
+            const data = await res.json();
+
+            const tbody = document.querySelector('#topProductsTable tbody');
+            tbody.innerHTML = '';
+            data.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${row.product}</td><td>${row.qty}</td>`;
+                tbody.appendChild(tr);
+            });
+
+            // Chart
+            const labels = data.map(r => r.product);
+            const quantities = data.map(r => r.qty);
+            const ctx = document.getElementById('topProductsChart').getContext('2d');
+            if (topProductsChart) topProductsChart.destroy();
+            topProductsChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Quantity Sold',
+                        data: quantities
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: { ticks: { autoSkip: false } }
+                    }
+                }
+            });
+        } catch (e) {
+            console.error(e);
+            showAlert(e.message);
+        }
+    }
+
+    // ===== REPORTS: LARGE ORDERS =====
+    async function loadLargeOrders() {
+        const minTotal = document.getElementById('largeOrdersMinTotal').value || 100;
+        try {
+            const res = await fetch(`${ORDERS_BASE}/api/orders/stream/large?minTotal=${encodeURIComponent(minTotal)}`);
+            if (!res.ok) throw new Error('Failed to load large orders');
+            const data = await res.json();
+            const tbody = document.querySelector('#largeOrdersTable tbody');
+            tbody.innerHTML = '';
+            data.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${row.orderId}</td><td>${row.createdAt}</td><td>${row.total}</td>`;
+                tbody.appendChild(tr);
+            });
+
+            // Chart
+            const labels = data.map(r => `#${r.orderId}`);
+            const totals = data.map(r => r.total);
+            const ctx = document.getElementById('largeOrdersChart').getContext('2d');
+            if (largeOrdersChart) largeOrdersChart.destroy();
+            largeOrdersChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Order Total',
+                        data: totals
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        } catch (e) {
+            console.error(e);
+            showAlert(e.message);
+        }
+    }
+
+    // ===== PAYMENT STATS =====
+    async function loadPaymentStats() {
+        const since = document.getElementById('statsSince').value.trim();
+        const until = document.getElementById('statsUntil').value.trim();
+        if (!since || !until) {
+            alert('Isi since & until dulu');
+            return;
+        }
+        try {
+            const url = `${PAYMENTS_BASE}/api/payments/stats/amounts?since=${encodeURIComponent(since)}&until=${encodeURIComponent(until)}`;
+            const res = await fetch(url);
+            if (!res.ok) throw new Error('Failed to load payment stats (CORS / format tanggal?)');
+            const data = await res.json();
+
+            // Update cards
+            document.getElementById('statCount').textContent = data.count;
+            document.getElementById('statSum').textContent = data.sum;
+            document.getElementById('statAvg').textContent = data.avg;
+
+            // Raw JSON
+            document.getElementById('paymentStatsBox').textContent = JSON.stringify(data, null, 2);
+
+            // Chart
+            const ctx = document.getElementById('paymentStatsChart').getContext('2d');
+            if (paymentStatsChart) paymentStatsChart.destroy();
+            paymentStatsChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Count', 'Sum', 'Avg'],
+                    datasets: [{
+                        label: 'Payment Stats',
+                        data: [data.count, data.sum, data.avg]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        } catch (e) {
+            console.error(e);
+            showAlert(e.message);
+        }
+    }
+
+    // ===== INITIAL LOAD =====
+    window.addEventListener('DOMContentLoaded', () => {
+        // default: users section
+        loadUsers();
+
+        // default range for payment stats
+        document.getElementById('statsSince').value = '2025-01-01T00:00:00Z';
+        document.getElementById('statsUntil').value = '2025-12-31T23:59:59Z';
+    });
+</script>
+</body>
+</html>

@@ -11,22 +11,29 @@ import java.util.Optional;
 
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
-  /** Latest payment for a given order (used by /api/payments/order/{orderId}) */
+  /** Latest payment untuk order tertentu (dipakai /api/payments/order/{orderId}) */
   Optional<Payment> findTopByOrderIdOrderByCreatedAtDesc(Long orderId);
 
-  /** Aggregation example: count/sum/avg over a time window (native SQL) */
-  @Query(value = """
-            SELECT COUNT(*) AS cnt,
-                   COALESCE(SUM(amount), 0) AS total,
-                   COALESCE(AVG(amount), 0) AS avg
-            FROM payments
-            WHERE created_at BETWEEN :since AND :until
-            """,
-          nativeQuery = true)
-  Object statsBetween(@Param("since") OffsetDateTime since,
-                      @Param("until") OffsetDateTime until);
+  /**
+   * Statistik jumlah pembayaran:
+   * - count: jumlah record
+   * - sum: total amount
+   * - avg: rata-rata amount
+   *
+   * Filter waktu opsional: from / until (created_at).
+   */
+  @Query("""
+            SELECT COUNT(p), COALESCE(SUM(p.amount), 0), COALESCE(AVG(p.amount), 0)
+            FROM Payment p
+            WHERE (:from IS NULL OR p.createdAt >= :from)
+              AND (:until IS NULL OR p.createdAt <= :until)
+            """)
+  Object[] aggregateAmounts(@Param("from") OffsetDateTime from,
+                            @Param("until") OffsetDateTime until);
 
-  /** Recent payments by status (native SQL) */
+  /**
+   * Recent payments by status (native SQL), misal untuk dashboard.
+   */
   @Query(value = """
             SELECT *
             FROM payments

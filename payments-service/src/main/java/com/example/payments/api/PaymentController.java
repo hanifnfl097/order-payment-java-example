@@ -3,10 +3,13 @@ package com.example.payments.api;
 import com.example.payments.dto.PaymentRequest;
 import com.example.payments.model.Payment;
 import com.example.payments.repo.PaymentRepository;
+import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -22,56 +25,141 @@ public class PaymentController {
     this.repo = repo;
   }
 
+  // -------------------------------------------------------------------------
+  // Basic CRUD-ish endpoints
+  // -------------------------------------------------------------------------
+
+  /** List semua payments (untuk debug / demo) */
   @GetMapping
-  public List<Payment> all() {
-    // keep entity listing for demo simplicity
+  public List<Payment> findAll() {
     return repo.findAll();
   }
 
-  @PostMapping
-  public Payment create(@RequestBody PaymentRequest req) {
-    Payment p = new Payment();
-    p.setOrderId(req.orderId());
-    p.setAmount(req.amount());
-    p.setStatus(req.status());
-    return repo.save(p);
+  /** Get payment by id */
+  @GetMapping("/{id}")
+  public ResponseEntity<Payment> findById(@PathVariable("id") Long id) {
+    return repo.findById(id)
+            .map(ResponseEntity::ok)
+            .orElse(ResponseEntity.notFound().build());
   }
 
-  /** ✅ Return 200 with DTO or 404 (no 500) */
+  /** Payment terbaru untuk sebuah order (dipakai service orders) */
   @GetMapping("/order/{orderId}")
-  public ResponseEntity<PaymentDto> byOrder(@PathVariable("orderId") Long orderId) {
+  public ResponseEntity<PaymentDto> latestForOrder(@PathVariable("orderId") Long orderId) {
     return repo.findTopByOrderIdOrderByCreatedAtDesc(orderId)
-            .map(p -> ResponseEntity.ok(new PaymentDto(
-                    p.getId(),
-                    p.getOrderId(),
-                    p.getAmount(),
-                    p.getStatus(),
-                    p.getCreatedAt()
-            )))
-            .orElseGet(() -> ResponseEntity.notFound().build());
+            .map(this::toDto)
+            .map(ResponseEntity::ok)
+            .orElse(ResponseEntity.notFound().build());
   }
 
-  /** SQL aggregation with null-safe handling */
-  @GetMapping("/stats/amounts")
-  public Map<String, Object> stats(
-          @RequestParam(name = "since") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime since,
-          @RequestParam(name = "until") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime until) {
+  /**
+   * Create payment (fake gateway).
+   *
+   * Untuk sekarang, kita terima:
+   *  - orderId
+   *  - amount
+   *  - status (misal "PENDING"/"PAID"/"FAILED")
+   *
+   * Nanti di STEP 5 bisa kita kembangkan supaya status otomatis PAID, dll.
+   */
+  @PostMapping
+  @ResponseStatus(HttpStatus.CREATED)
+  public PaymentDto create(@Valid @RequestBody PaymentRequest request) {
+    Payment p = new Payment();
+    p.setOrderId(request.orderId());
+    p.setAmount(request.amount());
+    p.setStatus(request.status());
+    p.setCreatedAt(OffsetDateTime.now());
 
-    Object row = repo.statsBetween(since, until);
+    Payment saved = repo.save(p);
+    return toDto(saved);
+  }
+
+  // -------------------------------------------------------------------------
+  // Stats & analytics
+  // -------------------------------------------------------------------------
+
+  /**
+   * Endpoint lama: /api/payments/stats/amounts
+   *
+   * Mengembalikan:
+   * {
+   *   "count": 10,
+   *   "sum":   1234.56,
+   *   "avg":   123.45
+   * }
+   *
+   * Parameter opsional:
+   *  - from  (ISO date-time)
+   *  - until (ISO date-time)
+   */
+  @GetMapping("/stats/amounts")
+  public Map<String, Object> statsAmounts(
+          @RequestParam(value = "from", required = false)
+          @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+          OffsetDateTime from,
+          @RequestParam(value = "until", required = false)
+          @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+          OffsetDateTime until
+  ) {
+    Object[] row = repo.aggregateAmounts(from, until);
+
     Map<String, Object> m = new HashMap<>();
-    if (row == null) {
+    if (row == null || row.length < 3) {
       m.put("count", 0L);
       m.put("sum", 0.0);
       m.put("avg", 0.0);
       return m;
     }
-    Object[] a = (Object[]) row;
-    m.put("count", a[0] == null ? 0L : ((Number) a[0]).longValue());
-    m.put("sum",   a[1] == null ? 0.0 : ((Number) a[1]).doubleValue());
-    m.put("avg",   a[2] == null ? 0.0 : ((Number) a[2]).doubleValue());
+
+    Number count = (Number) row[0];
+    Number sum = (Number) row[1];
+    Number avg = (Number) row[2];
+
+    m.put("count", count == null ? 0L : count.longValue());
+    // sum & avg tetap kita kirim sebagai double untuk kompatibilitas JSON lama
+    m.put("sum", sum == null ? 0.0 : new BigDecimal(sum.toString()).doubleValue());
+    m.put("avg", avg == null ? 0.0 : new BigDecimal(avg.toString()).doubleValue());
+
     return m;
   }
 
-  /** Local DTO for responses to orders-service */
-  public record PaymentDto(Long id, Long orderId, Double amount, String status, OffsetDateTime createdAt) {}
+  /**
+   * Recent payments by status (optional, berguna buat dashboard).
+   * Contoh: GET /api/payments/recent?status=PAID&limit=5
+   */
+  @GetMapping("/recent")
+  public List<PaymentDto> recentByStatus(
+          @RequestParam("status") String status,
+          @RequestParam(value = "limit", defaultValue = "5") int limit
+  ) {
+    return repo.recentByStatus(status, limit)
+            .stream()
+            .map(this::toDto)
+            .toList();
+  }
+
+  // -------------------------------------------------------------------------
+  // Mapper
+  // -------------------------------------------------------------------------
+
+  private PaymentDto toDto(Payment payment) {
+    return new PaymentDto(
+            payment.getId(),
+            payment.getOrderId(),
+            payment.getAmount(),
+            payment.getStatus(),
+            payment.getCreatedAt()
+    );
+  }
+
+  /** DTO untuk response ke orders-service / frontend */
+  public record PaymentDto(
+          Long id,
+          Long orderId,
+          BigDecimal amount,
+          String status,
+          OffsetDateTime createdAt
+  ) {
+  }
 }

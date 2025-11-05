@@ -4,7 +4,7 @@ import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
 
-public class CreateProductRequest {
+public class UpdateProductRequest {
 
     @NotBlank
     @Size(max = 255)
@@ -37,7 +37,7 @@ public class CreateProductRequest {
 
     private String specs;
 
-    public CreateProductRequest() {
+    public UpdateProductRequest() {
     }
 
     public String getName() {

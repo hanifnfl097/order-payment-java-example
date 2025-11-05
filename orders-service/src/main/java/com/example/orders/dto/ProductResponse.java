@@ -1,43 +1,33 @@
 package com.example.orders.dto;
 
-import jakarta.validation.constraints.*;
-
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 
-public class CreateProductRequest {
+public class ProductResponse {
 
-    @NotBlank
-    @Size(max = 255)
+    private Long id;
     private String name;
-
-    @NotBlank
-    @Size(max = 255)
     private String slug;
-
     private String description;
-
-    @NotNull
-    @DecimalMin(value = "0.01")
     private BigDecimal price;
-
-    @NotNull
-    @Min(0)
     private Integer stockQuantity;
-
-    @Size(max = 100)
     private String category;
-
-    @Size(max = 100)
     private String brand;
-
-    @Size(max = 1024)
     private String imageUrl;
-
     private String additionalImages;
-
     private String specs;
+    private OffsetDateTime createdAt;
+    private OffsetDateTime updatedAt;
 
-    public CreateProductRequest() {
+    public ProductResponse() {
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
     }
 
     public String getName() {
@@ -118,5 +108,21 @@ public class CreateProductRequest {
 
     public void setSpecs(String specs) {
         this.specs = specs;
+    }
+
+    public OffsetDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(OffsetDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public OffsetDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(OffsetDateTime updatedAt) {
+        this.updatedAt = updatedAt;
     }
 }

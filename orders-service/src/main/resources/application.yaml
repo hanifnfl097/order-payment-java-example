@@ -9,20 +9,22 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: validate   # keep validate; schema must exist
+      ddl-auto: validate   # schema harus sudah ada dari SQL migration
     properties:
       hibernate.format_sql: true
       hibernate.jdbc.lob.non_contextual_creation: true
 
   flyway:
-    enabled: false         # set to true if you want orders-service to run its migrations
+    enabled: false         # tetap false, kamu jalankan SQL manual via pgAdmin
     locations: classpath:db/migration
 
 logging:
   level:
     org.hibernate.SQL: debug
 
-# <<< important for PaymentsClient >>>
 payments:
-  # local run (Payments on localhost:8082)
   base-url: ${PAYMENTS_BASE_URL:http://localhost:8082}
+
+jwt:
+  secret: "ganti-ini-dengan-string-yang-lebih-panjang-dan-acak-ya-1234567890"
+  expiration-seconds: 3600
