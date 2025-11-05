@@ -30,30 +30,33 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // REST API stateless, jadi CSRF dimatikan
+                // REST API → CSRF dimatikan
                 .csrf(AbstractHttpConfigurer::disable)
 
-                // Tidak pakai HTTP Session
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // Stateless (tidak pakai HTTP Session)
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                // pakai UserDetailsService kita
+                // pakai UserDetailsService kita (opsional tapi oke)
                 .userDetailsService(userDetailsService)
 
                 .authorizeHttpRequests(auth -> auth
                         // ==== PUBLIC ENDPOINTS ====
+                        // register & login
                         .requestMatchers("/api/auth/**").permitAll()
+                        // katalog produk GET tetap public
                         .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
 
-                        // ==== ADMIN ONLY ====
+                        // ==== ADMIN ONLY (authority = 'ADMIN') ====
                         .requestMatchers(HttpMethod.POST, "/api/products/**").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/products/**").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/products/**").hasAuthority("ADMIN")
 
-                        // ==== OTHER: AUTHENTICATED ====
+                        // ==== ENDPOINT LAIN HARUS AUTHENTICATED ====
                         .anyRequest().authenticated()
                 )
 
-                // Tambah JWT filter sebelum UsernamePasswordAuthenticationFilter
+                // Tambahkan JWT filter sebelum UsernamePasswordAuthenticationFilter
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
