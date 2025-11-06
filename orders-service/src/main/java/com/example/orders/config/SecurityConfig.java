@@ -30,33 +30,25 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // REST API → CSRF dimatikan
+                // Stateless API, ga pakai session
                 .csrf(AbstractHttpConfigurer::disable)
-
-                // Stateless (tidak pakai HTTP Session)
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-
-                // pakai UserDetailsService kita (opsional tapi oke)
                 .userDetailsService(userDetailsService)
-
                 .authorizeHttpRequests(auth -> auth
-                        // ==== PUBLIC ENDPOINTS ====
-                        // register & login
+                        // ===== PUBLIC ENDPOINTS =====
                         .requestMatchers("/api/auth/**").permitAll()
-                        // katalog produk GET tetap public
                         .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
 
-                        // ==== ADMIN ONLY (authority = 'ADMIN') ====
+                        // ===== ADMIN ONLY =====
                         .requestMatchers(HttpMethod.POST, "/api/products/**").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/products/**").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/products/**").hasAuthority("ADMIN")
 
-                        // ==== ENDPOINT LAIN HARUS AUTHENTICATED ====
+                        // ===== SISANYA WAJIB LOGIN (JWT) =====
                         .anyRequest().authenticated()
                 )
-
-                // Tambahkan JWT filter sebelum UsernamePasswordAuthenticationFilter
+                // pasang filter JWT sebelum UsernamePasswordAuthenticationFilter
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

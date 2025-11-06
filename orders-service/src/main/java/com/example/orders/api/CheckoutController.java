@@ -24,9 +24,9 @@ public class CheckoutController {
     }
 
     /**
-     * Stateless checkout:
-     *  - menerima userId + list items + shipping info
-     *  - hanya boleh dipanggil oleh user itu sendiri (atau ADMIN)
+     * Checkout:
+     * - JWT wajib (user diambil dari token / AuthenticationPrincipal)
+     * - userId di body diabaikan, tapi tetap ada di DTO
      */
     @PostMapping("/orders/checkout")
     public CheckoutResponse checkout(@Valid @RequestBody CheckoutRequest request,
@@ -36,26 +36,29 @@ public class CheckoutController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthenticated");
         }
 
-        boolean isAdmin = "ADMIN".equals(currentUser.getRole().name());
-        if (!isAdmin && !currentUser.getId().equals(request.userId())) {
-            throw new ResponseStatusException(
-                    HttpStatus.FORBIDDEN,
-                    "You cannot create orders for another user"
-            );
-        }
+        Long effectiveUserId = currentUser.getId();
 
-        Order order = checkoutService.checkout(request);
+        CheckoutRequest fixedRequest = new CheckoutRequest(
+                effectiveUserId,
+                request.items(),
+                request.shippingAddress(),
+                request.contactPhone()
+        );
+
+        Order order = checkoutService.checkout(fixedRequest);
         return toResponse(order);
     }
 
     /**
-     * List semua order milik user tertentu.
-     *  - user hanya boleh lihat order miliknya sendiri (kecuali ADMIN).
+     * Ambil order milik user tertentu.
+     * - USER biasa hanya boleh lihat order miliknya sendiri
+     * - ADMIN boleh lihat order user mana pun
      */
     @GetMapping("/users/{userId}/orders")
-    public List<CheckoutResponse> userOrders(@PathVariable Long userId,
-                                             @AuthenticationPrincipal AppUserDetails currentUser) {
-
+    public List<CheckoutResponse> userOrders(
+            @PathVariable("userId") Long userId,                 // <== PENTING: sebutkan nama "userId"
+            @AuthenticationPrincipal AppUserDetails currentUser  // user dari JWT
+    ) {
         if (currentUser == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthenticated");
         }
