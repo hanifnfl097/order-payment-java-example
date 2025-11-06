@@ -1,75 +1,127 @@
 package com.example.payments.model;
 
+import com.example.payments.enums.PaymentStatus;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
+import java.time.LocalDateTime;
 
+/**
+ * Entity pembayaran yang bertindak sebagai fake payment gateway.
+ */
 @Entity
 @Table(name = "payments")
 public class Payment {
 
-  @Id
-  @GeneratedValue(strategy = GenerationType.IDENTITY)
-  private Long id;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-  // order_id BIGINT NOT NULL
-  @Column(name = "order_id", nullable = false)
-  private Long orderId;
+    // id order dari orders-service
+    @Column(name = "order_id", nullable = false)
+    private Long orderId;
 
-  // amount NUMERIC(12,2) NOT NULL
-  @Column(name = "amount", nullable = false, precision = 12, scale = 2)
-  private BigDecimal amount;
+    // jumlah yang harus dibayar
+    @Column(nullable = false, precision = 19, scale = 2)
+    private BigDecimal amount;
 
-  // status VARCHAR(20) NOT NULL
-  @Column(name = "status", length = 20, nullable = false)
-  private String status;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private PaymentStatus status;
 
-  // created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  @Column(name = "created_at", nullable = false)
-  private OffsetDateTime createdAt = OffsetDateTime.now();
+    // metode pembayaran, mis. "VIRTUAL_ACCOUNT", "CREDIT_CARD", dll.
+    @Column(nullable = false, length = 50)
+    private String method;
 
-  public Payment() {
-  }
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
 
-  // --- getters & setters ---
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
 
-  public Long getId() {
-    return id;
-  }
+    public Payment() {
+    }
 
-  public void setId(Long id) {
-    this.id = id;
-  }
+    public Payment(Long orderId, BigDecimal amount, PaymentStatus status, String method) {
+        this.orderId = orderId;
+        this.amount = amount;
+        this.status = status;
+        this.method = method;
+    }
 
-  public Long getOrderId() {
-    return orderId;
-  }
+    @PrePersist
+    public void prePersist() {
+        LocalDateTime now = LocalDateTime.now();
+        this.createdAt = now;
+        this.updatedAt = now;
 
-  public void setOrderId(Long orderId) {
-    this.orderId = orderId;
-  }
+        if (this.status == null) {
+            this.status = PaymentStatus.PENDING;
+        }
+        if (this.method == null) {
+            this.method = "VIRTUAL_ACCOUNT";
+        }
+    }
 
-  public BigDecimal getAmount() {
-    return amount;
-  }
+    @PreUpdate
+    public void preUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
 
-  public void setAmount(BigDecimal amount) {
-    this.amount = amount;
-  }
+    // ======= getters & setters =======
 
-  public String getStatus() {
-    return status;
-  }
+    public Long getId() {
+        return id;
+    }
 
-  public void setStatus(String status) {
-    this.status = status;
-  }
+    public Long getOrderId() {
+        return orderId;
+    }
 
-  public OffsetDateTime getCreatedAt() {
-    return createdAt;
-  }
+    public BigDecimal getAmount() {
+        return amount;
+    }
 
-  public void setCreatedAt(OffsetDateTime createdAt) {
-    this.createdAt = createdAt;
-  }
+    public PaymentStatus getStatus() {
+        return status;
+    }
+
+    public String getMethod() {
+        return method;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public void setOrderId(Long orderId) {
+        this.orderId = orderId;
+    }
+
+    public void setAmount(BigDecimal amount) {
+        this.amount = amount;
+    }
+
+    public void setStatus(PaymentStatus status) {
+        this.status = status;
+    }
+
+    public void setMethod(String method) {
+        this.method = method;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
 }

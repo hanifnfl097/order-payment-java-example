@@ -1,16 +1,20 @@
 package com.example.payments.api;
 
-import com.example.payments.dto.PaymentRequest;
+import com.example.payments.enums.PaymentStatus;
 import com.example.payments.model.Payment;
 import com.example.payments.repo.PaymentRepository;
-import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,147 +23,106 @@ import java.util.Map;
 @RequestMapping("/api/payments")
 public class PaymentController {
 
-  private final PaymentRepository repo;
+    private final PaymentRepository paymentRepository;
 
-  public PaymentController(PaymentRepository repo) {
-    this.repo = repo;
-  }
-
-  // -------------------------------------------------------------------------
-  // Basic CRUD-ish endpoints
-  // -------------------------------------------------------------------------
-
-  /** List semua payments (untuk debug / demo) */
-  @GetMapping
-  public List<Payment> findAll() {
-    return repo.findAll();
-  }
-
-  /** Get payment by id */
-  @GetMapping("/{id}")
-  public ResponseEntity<Payment> findById(@PathVariable("id") Long id) {
-    return repo.findById(id)
-            .map(ResponseEntity::ok)
-            .orElse(ResponseEntity.notFound().build());
-  }
-
-  /** Payment terbaru untuk sebuah order (dipakai service orders) */
-  @GetMapping("/order/{orderId}")
-  public ResponseEntity<PaymentDto> latestForOrder(@PathVariable("orderId") Long orderId) {
-    return repo.findTopByOrderIdOrderByCreatedAtDesc(orderId)
-            .map(this::toDto)
-            .map(ResponseEntity::ok)
-            .orElse(ResponseEntity.notFound().build());
-  }
-
-  /**
-   * Create payment (fake gateway).
-   *
-   * Untuk sekarang, kita terima:
-   *  - orderId
-   *  - amount
-   *  - status (misal "PENDING"/"PAID"/"FAILED")
-   *
-   * Nanti di STEP 5 bisa kita kembangkan supaya status otomatis PAID, dll.
-   */
-  @PostMapping
-  @ResponseStatus(HttpStatus.CREATED)
-  public PaymentDto create(@Valid @RequestBody PaymentRequest request) {
-    Payment p = new Payment();
-    p.setOrderId(request.orderId());
-    p.setAmount(request.amount());
-    p.setStatus(request.status());
-    p.setCreatedAt(OffsetDateTime.now());
-
-    Payment saved = repo.save(p);
-    return toDto(saved);
-  }
-
-  // -------------------------------------------------------------------------
-  // Stats & analytics
-  // -------------------------------------------------------------------------
-
-  /**
-   * Endpoint lama: /api/payments/stats/amounts
-   *
-   * Mengembalikan:
-   * {
-   *   "count": 10,
-   *   "sum":   1234.56,
-   *   "avg":   123.45
-   * }
-   *
-   * Parameter opsional:
-   *  - from  (ISO date-time)
-   *  - until (ISO date-time)
-   */
-  @GetMapping("/stats/amounts")
-  public Map<String, Object> statsAmounts(
-          @RequestParam(value = "from", required = false)
-          @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-          OffsetDateTime from,
-          @RequestParam(value = "until", required = false)
-          @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-          OffsetDateTime until
-  ) {
-    Object[] row = repo.aggregateAmounts(from, until);
-
-    Map<String, Object> m = new HashMap<>();
-    if (row == null || row.length < 3) {
-      m.put("count", 0L);
-      m.put("sum", 0.0);
-      m.put("avg", 0.0);
-      return m;
+    public PaymentController(PaymentRepository paymentRepository) {
+        this.paymentRepository = paymentRepository;
     }
 
-    Number count = (Number) row[0];
-    Number sum = (Number) row[1];
-    Number avg = (Number) row[2];
+    // ========= GET All Payments (dengan filter & paging) =========
+    // GET /api/payments?status=PAID&method=BANK_TRANSFER&page=0&size=10
+    @GetMapping
+    public Page<Payment> listPayments(
+            @RequestParam(name = "status", required = false) PaymentStatus status,
+            @RequestParam(name = "method", required = false) String method,
+            @RequestParam(name = "from", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+            @RequestParam(name = "to", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "10") int size
+    ) {
+        Sort sort = Sort.by("createdAt").descending();
+        Pageable pageable = PageRequest.of(page, size, sort);
 
-    m.put("count", count == null ? 0L : count.longValue());
-    // sum & avg tetap kita kirim sebagai double untuk kompatibilitas JSON lama
-    m.put("sum", sum == null ? 0.0 : new BigDecimal(sum.toString()).doubleValue());
-    m.put("avg", avg == null ? 0.0 : new BigDecimal(avg.toString()).doubleValue());
+        // kalau from / to tidak diisi, pakai range sangat lebar
+        LocalDateTime fromDate = (from != null)
+                ? from
+                : LocalDateTime.of(1970, 1, 1, 0, 0);
 
-    return m;
-  }
+        LocalDateTime toDate = (to != null)
+                ? to
+                : LocalDateTime.of(2100, 1, 1, 0, 0);
 
-  /**
-   * Recent payments by status (optional, berguna buat dashboard).
-   * Contoh: GET /api/payments/recent?status=PAID&limit=5
-   */
-  @GetMapping("/recent")
-  public List<PaymentDto> recentByStatus(
-          @RequestParam("status") String status,
-          @RequestParam(value = "limit", defaultValue = "5") int limit
-  ) {
-    return repo.recentByStatus(status, limit)
-            .stream()
-            .map(this::toDto)
-            .toList();
-  }
+        return paymentRepository.searchPayments(status, method, fromDate, toDate, pageable);
+    }
 
-  // -------------------------------------------------------------------------
-  // Mapper
-  // -------------------------------------------------------------------------
+    // ========= GET Payment By ID =========
+    // GET /api/payments/{id}
+    @GetMapping("/{id}")
+    public ResponseEntity<Payment> getPaymentById(@PathVariable("id") Long id) {
+        return paymentRepository.findById(id)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
 
-  private PaymentDto toDto(Payment payment) {
-    return new PaymentDto(
-            payment.getId(),
-            payment.getOrderId(),
-            payment.getAmount(),
-            payment.getStatus(),
-            payment.getCreatedAt()
-    );
-  }
+    // ========= GET Payment By Order ID =========
+    // GET /api/payments/order/{orderId}
+    @GetMapping("/order/{orderId}")
+    public ResponseEntity<Payment> getPaymentByOrderId(@PathVariable("orderId") Long orderId) {
+        return paymentRepository.findFirstByOrderId(orderId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
 
-  /** DTO untuk response ke orders-service / frontend */
-  public record PaymentDto(
-          Long id,
-          Long orderId,
-          BigDecimal amount,
-          String status,
-          OffsetDateTime createdAt
-  ) {
-  }
+    // ========= Create Payment =========
+    // POST /api/payments
+    @PostMapping
+    public ResponseEntity<Payment> createPayment(@RequestBody Payment request) {
+        // Biasanya status default PAID untuk contoh mini-project ini
+        if (request.getStatus() == null) {
+            request.setStatus(PaymentStatus.PAID);
+        }
+
+        request.setId(null); // pastikan dianggap insert, bukan update
+        request.setCreatedAt(LocalDateTime.now());
+        request.setUpdatedAt(LocalDateTime.now());
+
+        Payment saved = paymentRepository.save(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(saved);
+    }
+
+    // ========= Get Stats Amounts =========
+    // GET /api/payments/stats/amounts
+    @GetMapping("/stats/amounts")
+    public Map<String, BigDecimal> getStatsAmounts() {
+        LocalDateTime now = LocalDateTime.now();
+
+        // Hari ini (mulai jam 00:00 sampai sekarang)
+        LocalDateTime todayStart = LocalDate.now().atStartOfDay();
+        BigDecimal today = paymentRepository.totalPaidAmountBetween(
+                PaymentStatus.PAID, todayStart, now);
+
+        // 7 hari terakhir
+        BigDecimal last7Days = paymentRepository.totalPaidAmountBetween(
+                PaymentStatus.PAID, now.minusDays(7), now);
+
+        // 30 hari terakhir
+        BigDecimal last30Days = paymentRepository.totalPaidAmountBetween(
+                PaymentStatus.PAID, now.minusDays(30), now);
+
+        Map<String, BigDecimal> result = new HashMap<>();
+        result.put("today", today);
+        result.put("last7Days", last7Days);
+        result.put("last30Days", last30Days);
+
+        return result;
+    }
+
+    // ========= Get Recent Payments =========
+    // GET /api/payments/recent
+    @GetMapping("/recent")
+    public List<Payment> getRecentPayments() {
+        return paymentRepository.findTop5ByOrderByCreatedAtDesc();
+    }
 }
