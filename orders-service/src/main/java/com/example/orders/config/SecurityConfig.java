@@ -13,6 +13,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.Customizer; // <-- tambahkan import ini
 
 @Configuration
 @EnableMethodSecurity
@@ -30,12 +31,18 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+                // aktifkan CORS di Spring Security (pakai konfigurasi global)
+                .cors(Customizer.withDefaults())  // <--- BARU
+
                 // Stateless API, ga pakai session
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .userDetailsService(userDetailsService)
                 .authorizeHttpRequests(auth -> auth
+                        // izinkan semua preflight OPTIONS ke /api/**
+                        .requestMatchers(HttpMethod.OPTIONS, "/api/**").permitAll() // <--- BARU
+
                         // ===== PUBLIC ENDPOINTS =====
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
